@@ -1,23 +1,28 @@
+#include<LiquidCrystal.h>
+LiquidCrystal lcd(7,6,9,10,11,12);
 
 int tonePin = 2;
 int toneFreq = 1000;
 int ledPin = 13;
+int deLedPin = 4; // Silme Butonu Işığı
 int buttonPin = 8;
+int deletePin = 3; // Silme Butonu
 int debounceDelay = 30;
-
-int dotLength = 150; 
+int dotLength = 240; 
 
 
   int dotSpace = dotLength;
   int dashLength = dotLength*3;
   int letterSpace = dotLength*3;
   int wordSpace = dotLength*7; 
-  float wpm = 5000./dotLength;
+  float wpm = 1200./dotLength;
   
 int t1, t2, onTime, gap;
 bool newLetter, newWord, letterFound, keyboardText;
 int lineLength = 0;
-int maxLineLength = 20; 
+int maxLineLength = 16; 
+
+bool lcdAvailable = false; // Ekran Yazı Kontrolü
 
 char* letters[] = 
 {
@@ -38,15 +43,23 @@ int i, index;
 
 void setup() 
 {
+  lcd.begin(16,2); //LCD Ekran boyutu tanımlar
   delay(500);
   pinMode(ledPin, OUTPUT);
   pinMode(tonePin, OUTPUT);
   pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(deletePin, INPUT_PULLUP);
   Serial.begin(9600);
 
+  lcd.clear(); //Eğer Başlangıçta Ekranda Yazı Olursa Siler
+  lcd.setCursor(0, 0); // Ekranın 1. Satırı
+  lcd.print("Mors Kod Ceviri");
+  lcd.setCursor(0, 1); // Ekranın 2. Satırı
+  lcd.print("Aktif");
+  lcdAvailable = true; // Ekranda Yazı Olduğunu Belirler
   Serial.println();
   Serial.println("-------------------------------");
-  Serial.println("Merhaba Ben Sanal Morse Çevirmeyinim. ");
+  Serial.println("Merhaba Ben Sanal Morse Çevirmeniyim");
   Serial.println("Kelime Veya Morse Kodu Giriniz : ");
   Serial.println("-------------------------------");
       
@@ -55,11 +68,24 @@ void setup()
   keyboardText = false; 
 }
 
-void loop() 
-{
-
+void loop(){
+// Silme Butonu
+  if (digitalRead(deletePin) == LOW ) {
+    digitalWrite(deLedPin, HIGH);
+    delay(300);
+    digitalWrite(deLedPin, LOW);
+    Serial.println("         ");
+    lcd.clear();
+  }
+  
   if (Serial.available() > 0)
   {
+    //Ekranda yazı mevcut ise silme işlemi gerçekleştirir
+     if (lcdAvailable == true) {
+    lcd.clear();
+    lcdAvailable = false;
+    }
+
     if (keyboardText == false) 
     {
       Serial.println();
@@ -73,6 +99,7 @@ void loop()
     if (ch >= 'A' && ch <= 'Z')
     {
       Serial.print(ch); 
+      lcd.print(ch);
       Serial.print(" ");
       Serial.println(letters[ch-'A']);
       flashSequence(letters[ch-'A']);
@@ -81,13 +108,16 @@ void loop()
     if (ch >= '0' && ch <= '9')
     {
       Serial.print(ch);
+      lcd.print(ch);
       Serial.print(" ");
       Serial.println(numbers[ch-'0']);
       flashSequence(numbers[ch-'0']);
       delay(letterSpace);
     }
+
     if (ch == ' ')
     {
+      lcd.print(" ");
       Serial.println("_");
       delay(wordSpace);    
     } 
@@ -99,9 +129,19 @@ void loop()
       Serial.println("Morse Kodu Çevirildi.");
       Serial.println("-------------------------------");
       keyboardText = false;
+      delay(3000); //Yazı görüntülemek için süre
+      lcdAvailable = true; // Ekrana yazı yazıldıktan bir süre sonra aktif olur ve yazı silinir
      }
+      
+      //Ekranı Temizler
+      if (lcdAvailable == true) {
+    lcd.clear();
+    lcdAvailable = false;
+    }
+      
   }
- 
+  
+
   if (digitalRead(buttonPin) == LOW ) 
   {
     newLetter = true; 
@@ -132,8 +172,10 @@ void loop()
   gap=millis()-t2; 
   if (newLetter == true && gap>=letterSpace)  
   { 
-    
-
+    if (lcdAvailable == true) {
+    lcd.clear();
+    lcdAvailable = false;
+    }
 
     letterFound = false; keyLetter = 63; 
     for (i=0; i<=25; i++)
@@ -156,8 +198,12 @@ void loop()
           break ;     
         }
       }
-    }    
+    }   
+     
+
+    lcd.print(keyLetter);
     Serial.print(keyLetter);
+
     if(letterFound == false) 
     {
       tone(tonePin, 100, 500);
@@ -171,6 +217,7 @@ void loop()
   if (newWord == true && gap>=wordSpace*1.5)
     { 
      newWord = false; 
+     lcd.print("_");
      Serial.print("_");  
      lineLength=lineLength+1;
      
